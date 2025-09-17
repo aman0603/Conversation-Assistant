@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: conversation-assistant-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: conversation_assistant
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - conversation-assistant-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: conversation-assistant-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - conversation-assistant-network
+
+  api:
+    build: .
+    container_name: conversation-assistant-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: mongodb://admin:password@mongodb:27017/conversation_assistant?authSource=admin
+      REDIS_URL: redis://redis:6379
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+    env_file:
+      - .env
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - conversation-assistant-network
+    command: [".venv/bin/python", "-m", "src.api.main"]
+
+  mcp-server:
+    build: .
+    container_name: conversation-assistant-mcp
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: mongodb://admin:password@mongodb:27017/conversation_assistant?authSource=admin
+      REDIS_URL: redis://redis:6379
+      MCP_SERVER_HOST: 0.0.0.0
+      MCP_SERVER_PORT: 8001
+    env_file:
+      - .env
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - conversation-assistant-network
+    command: [".venv/bin/python", "-m", "src.mcp.server"]
+
+  streamlit:
+    build: .
+    container_name: conversation-assistant-ui
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      API_BASE_URL: http://api:8000
+      MCP_SERVER_URL: http://mcp-server:8001
+    env_file:
+      - .env
+    depends_on:
+      - api
+      - mcp-server
+    networks:
+      - conversation-assistant-network
+    command: [".venv/bin/streamlit", "run", "src/ui/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+
+volumes:
+  mongodb_data:
+
+networks:
+  conversation-assistant-network:
+    driver: bridge
