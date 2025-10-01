@@ -10,6 +10,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
@@ -114,12 +115,17 @@ class WhatsAppAIControl:
             return False
 
     def get_chats(self) -> List[Dict[str, Any]]:
-        """Get list of WhatsApp chats"""
+        """Get list of WhatsApp chats with better error handling"""
         chats = []
         try:
+            # Wait for chat list to be present
             WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "div[role='listitem']"))
             )
+
+            # Re-find elements to avoid stale references
+            import time
+            time.sleep(0.5)  # Small delay to ensure DOM is stable
 
             chat_elements = self.driver.find_elements(By.CSS_SELECTOR, "div[role='listitem']")
 
@@ -135,9 +141,15 @@ class WhatsAppAIControl:
                     for selector in name_selectors:
                         try:
                             name_element = chat.find_element(By.CSS_SELECTOR, selector)
-                            if name_element and name_element.text:
-                                name = name_element.get_attribute('title') or name_element.text
-                                break
+                            if name_element:
+                                # Try title attribute first, then text
+                                title_attr = name_element.get_attribute('title')
+                                if title_attr:
+                                    name = title_attr
+                                    break
+                                elif name_element.text:
+                                    name = name_element.text
+                                    break
                         except:
                             continue
 
@@ -149,21 +161,26 @@ class WhatsAppAIControl:
                     except:
                         pass
 
-                    chats.append({
-                        "name": name,
-                        "last_message": last_message,
-                        "element": chat
-                    })
-                except:
+                    if name != "Unknown":  # Only add chats with valid names
+                        chats.append({
+                            "name": name,
+                            "last_message": last_message,
+                            "element": chat
+                        })
+                except Exception as inner_e:
+                    # Log but continue processing other chats
+                    logger.debug(f"Error processing chat element: {inner_e}")
                     continue
 
+        except TimeoutException:
+            logger.warning("Timeout waiting for chat list to load")
         except Exception as e:
             logger.error(f"Error getting chats: {e}")
 
         return chats
 
-    def get_chat_messages(self, chat_name: str, count: int = 20) -> List[str]:
-        """Get recent messages from a specific chat"""
+    def get_chat_messages(self, chat_name: str, count: int = 20) -> List[Dict[str, str]]:
+        """Get recent messages from a specific chat with sender information and timestamps"""
         messages = []
         try:
             chats = self.get_chats()
@@ -181,18 +198,40 @@ class WhatsAppAIControl:
             import time
             time.sleep(2)
 
-            msg_selectors = [
-                "div[class*='message-in'] span[class*='selectable-text']",
-                "div[class*='message-out'] span[class*='selectable-text']",
-                "span[class*='selectable-text']"
-            ]
+            # Get all message containers to maintain chronological order
+            message_containers = self.driver.find_elements(By.CSS_SELECTOR,
+                "div[class*='message-in'], div[class*='message-out']")
 
-            for selector in msg_selectors:
+            # Process last N message containers
+            for idx, container in enumerate(message_containers[-count:]):
                 try:
-                    msg_elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                    for elem in msg_elements[-count:]:
-                        if elem.text:
-                            messages.append(elem.text)
+                    # Determine if it's incoming or outgoing
+                    is_incoming = 'message-in' in container.get_attribute('class')
+
+                    # Try to get timestamp
+                    timestamp = None
+                    try:
+                        time_elements = container.find_elements(By.CSS_SELECTOR,
+                            "span[dir='auto'][class*='_11JPr'], span[class*='_1LKHN']")
+                        if time_elements:
+                            timestamp = time_elements[-1].text
+                    except:
+                        pass
+
+                    # Get the actual message text
+                    text_elements = container.find_elements(By.CSS_SELECTOR,
+                        "span[class*='selectable-text']")
+
+                    for elem in text_elements:
+                        if elem.text and elem.text.strip():
+                            messages.append({
+                                "text": elem.text.strip(),
+                                "sender": chat_name if is_incoming else "You",
+                                "type": "incoming" if is_incoming else "outgoing",
+                                "timestamp": timestamp,
+                                "index": idx  # Track position for ordering
+                            })
+                            break  # Only take the first valid text from each container
                 except:
                     continue
 
@@ -201,19 +240,39 @@ class WhatsAppAIControl:
 
         return messages
 
+    def get_chat_messages_simple(self, chat_name: str, count: int = 20) -> List[str]:
+        """Get recent messages as simple text list (backward compatibility)"""
+        structured_messages = self.get_chat_messages(chat_name, count)
+        return [msg["text"] for msg in structured_messages]
+
     def send_message(self, chat_name: str, message: str) -> bool:
-        """Send a message to a WhatsApp chat"""
+        """Send a message to a WhatsApp chat with improved contact matching"""
         try:
             chat_found = False
             chats = self.get_chats()
 
+            # First try exact match
             for chat in chats:
                 if chat["name"].lower() == chat_name.lower():
+                    logger.info(f"Found exact match for '{chat_name}': {chat['name']}")
                     chat["element"].click()
                     chat_found = True
                     break
 
+            # If no exact match, try partial match (but be careful)
             if not chat_found:
+                for chat in chats:
+                    # Check if the search term is contained in the contact name
+                    # but avoid false matches (e.g., "Rin" matching "Rinku")
+                    if chat_name.lower() in chat["name"].lower() and len(chat_name) >= 3:
+                        logger.info(f"Found partial match for '{chat_name}': {chat['name']}")
+                        chat["element"].click()
+                        chat_found = True
+                        break
+
+            # If still not found, use search
+            if not chat_found:
+                logger.info(f"Contact '{chat_name}' not in recent chats, using search...")
                 search_box = self.driver.find_element(By.CSS_SELECTOR, "div[contenteditable='true'][data-tab='3']")
                 search_box.click()
                 search_box.clear()
@@ -222,11 +281,29 @@ class WhatsAppAIControl:
                 import time
                 time.sleep(2)
 
+                # Look for search results
                 results = self.driver.find_elements(By.CSS_SELECTOR, "div[role='listitem']")
-                if results:
+
+                # Try to find exact match in search results
+                for result in results:
+                    try:
+                        name_elem = result.find_element(By.CSS_SELECTOR, "span[title]")
+                        if name_elem:
+                            result_name = name_elem.get_attribute('title') or name_elem.text
+                            if result_name.lower() == chat_name.lower():
+                                logger.info(f"Found exact match in search: {result_name}")
+                                result.click()
+                                chat_found = True
+                                break
+                    except:
+                        continue
+
+                # If no exact match, click first result
+                if not chat_found and results:
+                    logger.info(f"No exact match, selecting first search result for '{chat_name}'")
                     results[0].click()
                     time.sleep(1)
-                else:
+                elif not results:
                     logger.error(f"Contact '{chat_name}' not found")
                     return False
 
@@ -293,10 +370,22 @@ Actions:
 2. {"action": "list"}
 3. {"action": "summary", "contact": "name", "count": 20}
 4. {"action": "suggest", "contact": "name"}
-5. {"action": "read", "contact": "name", "count": 10}
+5. {"action": "read", "contact": "name", "count": 10, "query_type": "all|last_from_contact|last_from_me|position_from_contact", "position": N}
+   - Use query_type: "last_from_contact" when user asks for last message FROM a contact
+   - Use query_type: "last_from_me" when user asks for last message TO a contact
+   - Use query_type: "position_from_contact" when user asks for Nth last message (second last, third last, etc.)
+   - Use query_type: "all" for general message reading
+   - position: 1 for last, 2 for second last, 3 for third last, etc.
 6. {"action": "auto_on"} or {"action": "auto_off"}
 7. {"action": "status"}
 8. {"action": "error", "message": "explanation"}
+
+Examples:
+- "What did John say last?" -> {"action": "read", "contact": "John", "count": 20, "query_type": "last_from_contact"}
+- "What is the second last message of mehul?" -> {"action": "read", "contact": "Mehul", "count": 20, "query_type": "position_from_contact", "position": 2}
+- "What was mehul's third last message?" -> {"action": "read", "contact": "Mehul", "count": 20, "query_type": "position_from_contact", "position": 3}
+- "What did I last send to Sarah?" -> {"action": "read", "contact": "Sarah", "count": 20, "query_type": "last_from_me"}
+- "Show messages with Emma" -> {"action": "read", "contact": "Emma", "count": 10, "query_type": "all"}
 
 Return ONLY the JSON, no other text."""
 
@@ -347,7 +436,9 @@ Return ONLY the JSON, no other text."""
             if not messages:
                 return f"No messages found with {contact}"
 
-            summary_prompt = f"Summarize in 3 bullet points:\n" + "\n".join(messages)
+            # Convert to text for summary
+            message_texts = [f"{msg['sender']}: {msg['text']}" for msg in messages]
+            summary_prompt = f"Summarize in 3 bullet points:\n" + "\n".join(message_texts)
             summary = await self.gemini_service.generate_response(
                 prompt=summary_prompt,
                 system_prompt="Create a concise summary."
@@ -357,7 +448,10 @@ Return ONLY the JSON, no other text."""
         elif action == "suggest":
             contact = action_data.get("contact", "")
             messages = self.get_chat_messages(contact, 10)
-            context = "\n".join(messages[-5:]) if messages else "No messages"
+
+            # Get last few incoming messages from contact for context
+            incoming_msgs = [msg for msg in messages if msg["type"] == "incoming"]
+            context = "\n".join([msg["text"] for msg in incoming_msgs[-3:]]) if incoming_msgs else "No messages"
 
             suggestions = await self.gemini_service.generate_response(
                 prompt=f"Suggest 3 replies for:\n{context}",
@@ -368,15 +462,51 @@ Return ONLY the JSON, no other text."""
         elif action == "read":
             contact = action_data.get("contact", "")
             count = action_data.get("count", 10)
+            query_type = action_data.get("query_type", "all")
+            position = action_data.get("position", 1)  # For positional queries
             messages = self.get_chat_messages(contact, count)
 
             if not messages:
                 return f"No messages with {contact}"
 
-            result = f"📖 **Messages with {contact}:**\n"
-            for msg in messages[-5:]:
-                result += f"• {msg}\n"
-            return result
+            # Handle specific query types
+            if query_type == "last_from_contact":
+                # Get last message from the contact
+                incoming = [msg for msg in messages if msg["type"] == "incoming"]
+                if incoming:
+                    last_msg = incoming[-1]
+                    return f"📖 **Last message from {contact}:** {last_msg['text']}"
+                else:
+                    return f"No recent messages from {contact}"
+
+            elif query_type == "position_from_contact":
+                # Get Nth last message from the contact
+                incoming = [msg for msg in messages if msg["type"] == "incoming"]
+                if incoming and len(incoming) >= position:
+                    # -1 for last, -2 for second last, etc.
+                    target_msg = incoming[-position]
+                    position_text = "last" if position == 1 else f"{self._ordinal(position)} last"
+                    return f"📖 **{position_text.capitalize()} message from {contact}:** {target_msg['text']}"
+                else:
+                    return f"Not enough messages from {contact} (only {len(incoming)} found)"
+
+            elif query_type == "last_from_me":
+                # Get last message I sent
+                outgoing = [msg for msg in messages if msg["type"] == "outgoing"]
+                if outgoing:
+                    last_msg = outgoing[-1]
+                    return f"📖 **Last message you sent to {contact}:** {last_msg['text']}"
+                else:
+                    return f"No recent messages sent to {contact}"
+
+            else:
+                # Show recent conversation with better formatting
+                result = f"📖 **Recent messages with {contact}:**\n"
+                for msg in messages[-5:]:
+                    prefix = "← " if msg["type"] == "incoming" else "→ "
+                    time_str = f" [{msg['timestamp']}]" if msg.get('timestamp') else ""
+                    result += f"{prefix}{msg['text']}{time_str}\n"
+                return result
 
         elif action == "auto_on":
             self.auto_reply = True
@@ -394,6 +524,14 @@ Return ONLY the JSON, no other text."""
             return action_data.get("message", "Command not understood")
 
         return "Unknown action"
+
+    def _ordinal(self, n: int) -> str:
+        """Convert number to ordinal (1st, 2nd, 3rd, etc.)"""
+        if 10 <= n % 100 <= 20:
+            suffix = 'th'
+        else:
+            suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')
+        return f"{n}{suffix}"
 
     async def handle_direct_command(self, command: str) -> str:
         """Handle commands that don't need AI parsing"""
@@ -485,12 +623,15 @@ Return ONLY the JSON, no other text."""
                             self.console.print(f"\n[yellow]New message from {chat_name}:[/yellow] {last_msg}")
 
                             if self.auto_reply:
-                                ai_response = await self.gemini_service.generate_response(
-                                    prompt=last_msg,
-                                    system_prompt=f"Reply briefly to this WhatsApp message from {chat_name}."
-                                )
-                                if self.send_message(chat_name, ai_response):
-                                    self.console.print(f"[green]Auto-replied:[/green] {ai_response}")
+                                # Only auto-reply to actual incoming messages, not our own
+                                last_structured = self.get_chat_messages(chat_name, 1)
+                                if last_structured and last_structured[-1]["type"] == "incoming":
+                                    ai_response = await self.gemini_service.generate_response(
+                                        prompt=last_msg,
+                                        system_prompt=f"Reply briefly to this WhatsApp message from {chat_name}."
+                                    )
+                                    if self.send_message(chat_name, ai_response):
+                                        self.console.print(f"[green]Auto-replied:[/green] {ai_response}")
 
                             last_messages[chat_name] = last_msg
                             print("\n> " + input_buffer, end="", flush=True)  # Restore input line

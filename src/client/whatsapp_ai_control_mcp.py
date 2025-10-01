@@ -122,9 +122,9 @@ Natural language commands:
                 # MCP returns the parsed action, now execute it locally with real WhatsApp
                 if action == 'list':
                     # Use actual contact list
-                    result = f"Contacts ({len(self.contact_list)}):\n"
+                    result = f"📋 **Your Contacts ({len(self.contact_list)}):**\n\n"
                     for i, contact in enumerate(self.contact_list[:15], 1):
-                        result += f"{i}. {contact}\n"
+                        result += f"  {i}. {contact}\n"
                     return result
 
                 elif action == 'send':
@@ -132,47 +132,76 @@ Natural language commands:
                     message = content.get('message')
                     # Execute real send
                     if self.send_message(contact, message):
-                        return f"✓ Sent to {contact}: '{message}'"
+                        return f"✅ **Sent to {contact}:**\n→ {message}"
                     else:
-                        return f"Failed to send to {contact}"
+                        return f"❌ Failed to send to {contact}"
 
                 elif action == 'read':
                     contact = content.get('contact')
                     count = content.get('count', 10)
-                    print(f"[DEBUG] Execute command - Reading messages for contact: '{contact}', count: {count}")
+                    query_type = content.get('query_type', 'all')
+                    print(f"[DEBUG] Execute command - Reading messages for contact: '{contact}', count: {count}, query_type: {query_type}")
 
                     # Get real messages
                     messages = self.get_chat_messages(contact, count)
                     print(f"[DEBUG] get_chat_messages returned {len(messages)} messages")
 
-                    if messages:
-                        # Check if user asked for just last message
-                        cmd_lower = command.lower()
-                        if 'last' in cmd_lower and ('message' in cmd_lower or 'msg' in cmd_lower):
-                            # Show just the last message
-                            return f"Last message with {contact}:\n→ {messages[-1]}"
-                        else:
-                            # Show last 5 messages
-                            result = f"Last messages with {contact}:\n"
-                            for msg in messages[-5:]:
-                                result += f"• {msg}\n"
-                            return result
-                    else:
+                    if not messages:
                         return f"No messages found with {contact}"
+
+                    # Handle specific query types
+                    if query_type == 'last_from_contact':
+                        # Get last message from the contact
+                        incoming = [msg for msg in messages if msg["type"] == "incoming"]
+                        if incoming:
+                            last_msg = incoming[-1]
+                            return f"📖 **Last message from {contact}:**\n→ {last_msg['text']}"
+                        else:
+                            return f"❌ No recent messages from {contact}"
+
+                    elif query_type == 'position_from_contact':
+                        # Get Nth last message from the contact
+                        incoming = [msg for msg in messages if msg["type"] == "incoming"]
+                        if incoming and len(incoming) >= position:
+                            # -1 for last, -2 for second last, etc.
+                            target_msg = incoming[-position]
+                            position_text = "Last" if position == 1 else f"{self._ordinal(position)} last"
+                            return f"📖 **{position_text} message from {contact}:**\n→ {target_msg['text']}"
+                        else:
+                            return f"❌ Not enough messages from {contact} (only {len(incoming)} found)"
+
+                    elif query_type == 'last_from_me':
+                        # Get last message I sent
+                        outgoing = [msg for msg in messages if msg["type"] == "outgoing"]
+                        if outgoing:
+                            last_msg = outgoing[-1]
+                            return f"📖 **Last message you sent to {contact}:**\n→ {last_msg['text']}"
+                        else:
+                            return f"❌ No recent messages sent to {contact}"
+
+                    else:
+                        # Show recent conversation with better formatting
+                        result = f"📖 **Recent messages with {contact}:**\n\n"
+                        for msg in messages[-5:]:
+                            prefix = "  ← " if msg["type"] == "incoming" else "  → "
+                            result += f"{prefix}{msg['text']}\n"
+                        return result
 
                 elif action == 'summary':
                     contact = content.get('contact')
                     # Get real messages for summary
                     messages = self.get_chat_messages(contact, 20)
                     if messages:
+                        # Convert to text with sender info for summary
+                        message_texts = [f"{msg['sender']}: {msg['text']}" for msg in messages]
                         # Use local Gemini for summary
                         if not self.gemini_service:
                             self.gemini_service = GeminiService()
                         summary = await self.gemini_service.generate_response(
-                            prompt=f"Summarize this WhatsApp conversation in 3 bullet points:\n" + "\n".join(messages),
+                            prompt=f"Summarize this WhatsApp conversation in 3 bullet points:\n" + "\n".join(message_texts),
                             system_prompt="Create a concise summary."
                         )
-                        return f"Summary of chat with {contact}:\n{summary}"
+                        return f"📊 **Summary of chat with {contact}:**\n{summary}"
                     else:
                         return f"No messages to summarize with {contact}"
 
@@ -180,13 +209,17 @@ Natural language commands:
                     contact = content.get('contact')
                     messages = self.get_chat_messages(contact, 10)
                     if messages:
+                        # Get last few incoming messages from contact for context
+                        incoming_msgs = [msg for msg in messages if msg["type"] == "incoming"]
+                        context = "\n".join([msg["text"] for msg in incoming_msgs[-3:]]) if incoming_msgs else "No messages"
+
                         if not self.gemini_service:
                             self.gemini_service = GeminiService()
                         suggestions = await self.gemini_service.generate_response(
-                            prompt=f"Suggest 3 good replies for this conversation:\n" + "\n".join(messages[-5:]),
+                            prompt=f"Suggest 3 good replies for this conversation:\n{context}",
                             system_prompt="Generate 3 brief, natural message suggestions."
                         )
-                        return f"Reply suggestions for {contact}:\n{suggestions}"
+                        return f"💡 **Reply suggestions for {contact}:**\n{suggestions}"
                     else:
                         return f"No conversation to analyze with {contact}"
 
@@ -216,6 +249,14 @@ Natural language commands:
 
             # Process the command in standalone mode
             return await self.process_command_direct(command)
+
+    def _ordinal(self, n: int) -> str:
+        """Convert number to ordinal (1st, 2nd, 3rd, etc.)"""
+        if 10 <= n % 100 <= 20:
+            suffix = 'th'
+        else:
+            suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')
+        return f"{n}{suffix}"
 
     async def process_command_direct(self, command: str) -> str:
         """Process command directly with local AI"""
@@ -523,8 +564,8 @@ Suggest a natural, appropriate response."""
 
         return chats
 
-    def get_chat_messages(self, chat_name: str, count: int = 20) -> List[str]:
-        """Get recent messages from a specific chat"""
+    def get_chat_messages(self, chat_name: str, count: int = 20) -> List[Dict[str, str]]:
+        """Get recent messages from a specific chat with sender information"""
         import time
         from selenium.webdriver.common.keys import Keys
         from selenium.webdriver.common.action_chains import ActionChains
@@ -600,43 +641,40 @@ Suggest a natural, appropriate response."""
 
             print("[DEBUG] Looking for message elements...")
 
-            # Try different selectors to get messages
-            msg_selectors = [
-                "div[class*='message-in'] span[class*='selectable-text']",
-                "div[class*='message-out'] span[class*='selectable-text']",
-                "span[class*='selectable-text']"
-            ]
+            # Get all message containers to maintain chronological order
+            message_containers = self.driver.find_elements(By.CSS_SELECTOR,
+                "div[class*='message-in'], div[class*='message-out']")
 
-            for selector in msg_selectors:
+            print(f"[DEBUG] Found {len(message_containers)} message containers")
+
+            # Process last N message containers
+            for container in message_containers[-count:]:
                 try:
-                    msg_elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                    print(f"[DEBUG] Selector '{selector}' found {len(msg_elements)} elements")
+                    # Determine if it's incoming or outgoing
+                    is_incoming = 'message-in' in container.get_attribute('class')
 
-                    for elem in msg_elements[-count:]:
-                        try:
-                            text = elem.text.strip()
-                            if text and len(text) > 1:
-                                # Filter out timestamps and UI elements
-                                if not any(skip in text.lower() for skip in ['type a message', 'search', 'online', 'typing']):
-                                    messages.append(text)
-                                    print(f"[DEBUG] Added message: {text[:50]}..." if len(text) > 50 else f"[DEBUG] Added message: {text}")
-                        except Exception as e:
-                            print(f"[DEBUG] Error getting text from element: {e}")
-                            continue
+                    # Get the actual message text
+                    text_elements = container.find_elements(By.CSS_SELECTOR,
+                        "span[class*='selectable-text']")
+
+                    for elem in text_elements:
+                        text = elem.text.strip()
+                        if text and len(text) > 1:
+                            # Filter out timestamps and UI elements
+                            if not any(skip in text.lower() for skip in ['type a message', 'search', 'online', 'typing']):
+                                messages.append({
+                                    "text": text,
+                                    "sender": chat_name if is_incoming else "You",
+                                    "type": "incoming" if is_incoming else "outgoing"
+                                })
+                                sender_type = "incoming" if is_incoming else "outgoing"
+                                print(f"[DEBUG] Added {sender_type} message: {text[:50]}..." if len(text) > 50 else f"[DEBUG] Added {sender_type} message: {text}")
+                                break  # Only take the first valid text from each container
                 except Exception as e:
-                    print(f"[DEBUG] Selector '{selector}' failed: {e}")
+                    print(f"[DEBUG] Error processing message container: {e}")
                     continue
 
-            # Remove duplicates while preserving order
-            seen = set()
-            unique_messages = []
-            for msg in messages:
-                if msg not in seen:
-                    seen.add(msg)
-                    unique_messages.append(msg)
-
-            messages = unique_messages
-            print(f"[DEBUG] Total unique messages collected: {len(messages)}")
+            print(f"[DEBUG] Total messages collected: {len(messages)}")
 
         except Exception as e:
             print(f"[DEBUG] Error in get_chat_messages: {e}")
@@ -644,49 +682,95 @@ Suggest a natural, appropriate response."""
 
         return messages
 
+    def get_chat_messages_simple(self, chat_name: str, count: int = 20) -> List[str]:
+        """Get recent messages as simple text list (backward compatibility)"""
+        structured_messages = self.get_chat_messages(chat_name, count)
+        return [msg["text"] for msg in structured_messages]
+
     def send_message(self, chat_name: str, message: str) -> bool:
-        """Send a message to a WhatsApp chat"""
+        """Send a message to a WhatsApp chat with improved contact matching"""
         try:
-            # Search for contact
-            search_box = self.driver.find_element(By.CSS_SELECTOR, "div[contenteditable='true'][data-tab='3']")
-            search_box.click()
-            search_box.send_keys(Keys.ESCAPE)
             import time
-            time.sleep(0.5)
+            chat_found = False
 
-            search_box.click()
-            search_box.send_keys(Keys.CONTROL + "a")
-            search_box.send_keys(Keys.DELETE)
-            search_box.send_keys(chat_name)
-            time.sleep(1)
+            # First, try to find contact in recent chats
+            chats = self.get_chats()
 
-            results = self.driver.find_elements(By.CSS_SELECTOR, "div[role='listitem']")
-            if results:
-                results[0].click()
+            # Try exact match first
+            for chat in chats:
+                if chat["name"].lower() == chat_name.lower():
+                    logger.info(f"Found exact match for '{chat_name}': {chat['name']}")
+                    chat["element"].click()
+                    chat_found = True
+                    break
+
+            # If not found in recent chats, use search
+            if not chat_found:
+                logger.info(f"Contact '{chat_name}' not in recent chats, using search...")
+                # Search for contact
+                search_box = self.driver.find_element(By.CSS_SELECTOR, "div[contenteditable='true'][data-tab='3']")
+                search_box.click()
+                search_box.send_keys(Keys.ESCAPE)
+                time.sleep(0.5)
+
+                search_box.click()
+                search_box.send_keys(Keys.CONTROL + "a")
+                search_box.send_keys(Keys.DELETE)
+                search_box.send_keys(chat_name)
                 time.sleep(1)
 
-                # Find message input box
-                input_selectors = [
-                    "div[contenteditable='true'][data-tab='10']",
-                    "footer div[contenteditable='true']"
-                ]
+                results = self.driver.find_elements(By.CSS_SELECTOR, "div[role='listitem']")
 
-                input_box = None
-                for selector in input_selectors:
+                # Try to find exact match in search results
+                for result in results:
                     try:
-                        elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                        if elements:
-                            input_box = elements[-1]
-                            break
+                        name_elem = result.find_element(By.CSS_SELECTOR, "span[title]")
+                        if name_elem:
+                            result_name = name_elem.get_attribute('title') or name_elem.text
+                            if result_name.lower() == chat_name.lower():
+                                logger.info(f"Found exact match in search: {result_name}")
+                                result.click()
+                                chat_found = True
+                                break
                     except:
                         continue
 
-                if input_box:
-                    input_box.click()
-                    input_box.clear()
-                    input_box.send_keys(message)
-                    input_box.send_keys(Keys.ENTER)
-                    return True
+                # If no exact match, click first result
+                if not chat_found and results:
+                    logger.info(f"No exact match, selecting first search result for '{chat_name}'")
+                    results[0].click()
+                elif not results:
+                    logger.error(f"Contact '{chat_name}' not found")
+                    return False
+
+            time.sleep(1)
+
+            # Find message input box
+            input_selectors = [
+                "div[contenteditable='true'][data-tab='10']",
+                "footer div[contenteditable='true']"
+            ]
+
+            input_box = None
+            for selector in input_selectors:
+                try:
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    if elements:
+                        input_box = elements[-1]
+                        break
+                except:
+                    continue
+
+            if input_box:
+                input_box.click()
+                input_box.clear()
+                input_box.send_keys(message)
+                input_box.send_keys(Keys.ENTER)
+                logger.info(f"Message sent to {chat_name}")
+                return True
+            else:
+                logger.error("Could not find message input box")
+                return False
 
         except Exception as e:
             logger.error(f"Error sending message: {e}")

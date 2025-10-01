@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Report: General-Purpose Conversation Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Harmony -->
+    <!-- Application Structure Plan: The application structure is a single-page scrolling narrative with a sticky top navigation for easy access. The flow has been updated to reflect a more technical audience: Concept -> Architecture -> Mental Model -> Feasibility/Tech -> Roadmap -> Vision -> References. This logical progression first introduces the idea, then dives deep into the 'how' (Architecture, Mental Model), assesses the 'what' (Feasibility, Tech), plans the 'when' (Roadmap), and finally explores the 'why' (Vision), supported by the 'proof' (References). This structure provides a comprehensive overview for both technical and strategic stakeholders. -->
+    <!-- Visualization & Content Choices: 
+    - Report Info: Workflow & Architecture (6 stages) -> Goal: Organize/Explain -> Viz: Interactive horizontal stepper diagram -> Interaction: Click a stage to view details -> Justification: Clearly visualizes a multi-stage process, preventing information overload by revealing details on demand. -> Method: HTML/CSS/JS.
+    - Report Info: Mental Model Formation -> Goal: Explain a core concept -> Viz: Two-column layout with descriptive cards -> Interaction: Static display -> Justification: Breaks down a complex abstract concept into digestible components and provides concrete examples of its application. -> Method: HTML/CSS.
+    - Report Info: Handling Challenges -> Goal: Compare Problem/Solution -> Viz: Card layout showing challenge and corresponding solution -> Interaction: Static display -> Justification: Directly maps problems to solutions, which is clearer and more impactful than a simple list. -> Method: HTML/CSS.
+    - Report Info: Feasibility Radar Chart -> Goal: Compare -> Viz: Radar Chart -> Interaction: Hover for tooltips -> Justification: Provides a quick multi-dimensional view of technical readiness, updated with more specific technical labels. -> Library: Chart.js.
+    - Report Info: References -> Goal: Inform/Provide evidence -> Viz: Ordered list -> Justification: Standard, clear format for academic/industry references. -> Method: HTML.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFBF8; /* Warm off-white */
+            color: #374151; /* Cool gray */
+        }
+        .nav-link {
+            transition: all 0.3s ease;
+            position: relative;
+            padding-bottom: 4px;
+        }
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background-color: #3B82F6; /* Accent blue */
+            transition: width 0.3s ease;
+        }
+        .nav-link.active::after, .nav-link:hover::after {
+            width: 100%;
+        }
+        .active-section {
+            display: block !important;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 40vh;
+            max-height: 450px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            top: 12px;
+            left: -21px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #60A5FA;
+            border: 2px solid #BFDBFE;
+        }
+        .timeline-item.active::before {
+            background-color: #1D4ED8;
+            transform: scale(1.2);
+        }
+        .stepper-item.active {
+            background-color: #3B82F6 !important;
+            color: white !important;
+            border-color: #2563EB !important;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header class="bg-white/80 backdrop-blur-lg sticky top-0 z-50 shadow-sm">
+        <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <span class="font-bold text-xl text-gray-800">Conversation Copilot</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="#concept" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600">Concept</a>
+                        <a href="#architecture" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600">Architecture</a>
+                        <a href="#mental-model" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600">Mental Model</a>
+                        <a href="#feasibility" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600">Feasibility</a>
+                        <a href="#roadmap" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600">Roadmap</a>
+                        <a href="#vision" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600">Vision</a>
+                        <a href="#references" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600">References</a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <section id="concept" class="py-20 md:py-28">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                <h1 class="text-4xl md:text-6xl font-bold tracking-tight text-gray-900">A Universal Conversation Assistant</h1>
+                <p class="mt-6 max-w-3xl mx-auto text-lg md:text-xl text-gray-600">An AI-powered copilot to provide real-time guidance, steering, and analysis in any conversation, from professional negotiations to personal discussions.</p>
+                
+                <div class="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-left">
+                    <div class="bg-white p-6 rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300">
+                        <h3 class="text-xl font-semibold text-gray-900">Listen & Read</h3>
+                        <p class="mt-2 text-gray-600">With permission, the assistant ingests conversations from voice calls, chats, and emails to build a complete picture.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300">
+                        <h3 class="text-xl font-semibold text-gray-900">Track & Understand</h3>
+                        <p class="mt-2 text-gray-600">Continuously tracks context, intent, tone, and emotional state to understand the dynamics of the dialogue.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300">
+                        <h3 class="text-xl font-semibold text-gray-900">Guide & Suggest</h3>
+                        <p class="mt-2 text-gray-600">Allows users to prompt on-demand for guidance, such as "Suggest a professional but firm reply."</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300">
+                        <h3 class="text-xl font-semibold text-gray-900">Alert & Notify</h3>
+                        <p class="mt-2 text-gray-600">Generates real-time alerts for negative sentiment shifts, topic drift, or manipulative language.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="architecture" class="py-20 bg-white">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center">
+                    <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Workflow and Architecture</h2>
+                    <p class="mt-4 max-w-2xl mx-auto text-lg text-gray-600">The system processes conversations through a multi-stage pipeline, from initial data capture to intelligent output. Click on each stage below to understand its specific function in the architecture.</p>
+                </div>
+
+                <div class="mt-12">
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        <div id="stepper-btn-1" class="stepper-item active text-center p-4 border-2 bg-blue-500 text-white border-blue-600 rounded-lg cursor-pointer transition-all">
+                            <h3 class="font-bold">1. Input Capture</h3>
+                        </div>
+                        <div id="stepper-btn-2" class="stepper-item text-center p-4 border-2 bg-gray-100 text-gray-800 border-gray-300 rounded-lg cursor-pointer transition-all">
+                            <h3 class="font-bold">2. Preprocessing</h3>
+                        </div>
+                        <div id="stepper-btn-3" class="stepper-item text-center p-4 border-2 bg-gray-100 text-gray-800 border-gray-300 rounded-lg cursor-pointer transition-all">
+                            <h3 class="font-bold">3. Mental Model</h3>
+                        </div>
+                        <div id="stepper-btn-4" class="stepper-item text-center p-4 border-2 bg-gray-100 text-gray-800 border-gray-300 rounded-lg cursor-pointer transition-all">
+                            <h3 class="font-bold">4. Context Filtering</h3>
+                        </div>
+                         <div id="stepper-btn-5" class="stepper-item text-center p-4 border-2 bg-gray-100 text-gray-800 border-gray-300 rounded-lg cursor-pointer transition-all">
+                            <h3 class="font-bold">5. AI Engine</h3>
+                        </div>
+                         <div id="stepper-btn-6" class="stepper-item text-center p-4 border-2 bg-gray-100 text-gray-800 border-gray-300 rounded-lg cursor-pointer transition-all">
+                            <h3 class="font-bold">6. Output</h3>
+                        </div>
+                    </div>
+                    <div class="mt-8 bg-gray-50 p-8 rounded-lg min-h-[200px] shadow-inner">
+                        <div id="stepper-content-1" class="stepper-content">
+                            <h4 class="text-2xl font-semibold mb-4 text-blue-900">Stage 1: Input Capture</h4>
+                            <p class="text-gray-700">This stage focuses on ingesting data from all relevant sources. It uses official APIs for reliability and has robust mechanisms for handling various media types to ensure no part of the conversation is lost.</p>
+                             <ul class="mt-4 space-y-2 list-disc list-inside text-gray-600">
+                                <li><strong>Chat/Text:</strong> Connects to WhatsApp Business and Slack APIs for real-time message ingestion.</li>
+                                <li><strong>Media:</strong> Captures images, voice notes, and documents shared within the conversation.</li>
+                            </ul>
+                        </div>
+                        <div id="stepper-content-2" class="stepper-content hidden">
+                            <h4 class="text-2xl font-semibold mb-4 text-gray-900">Stage 2: Preprocessing</h4>
+                            <p class="text-gray-700">Raw data is cleaned and structured for analysis. This step is crucial for accuracy, as it standardizes the input and extracts key metadata that informs the system's understanding of context and time.</p>
+                             <ul class="mt-4 space-y-2 list-disc list-inside text-gray-600">
+                                <li><strong>Text Normalization:</strong> Cleans text by correcting typos and standardizing slang or abbreviations.</li>
+                                <li><strong>Media Analysis:</strong> Transcribes audio, extracts text from images (OCR), and generates captions.</li>
+                                <li><strong>Temporal Tagging:</strong> Each piece of data is timestamped to maintain conversational order and analyze time gaps.</li>
+                            </ul>
+                        </div>
+                        <div id="stepper-content-3" class="stepper-content hidden">
+                            <h4 class="text-2xl font-semibold mb-4 text-gray-900">Stage 3: Central Mental Model</h4>
+                            <p class="text-gray-700">The processed data feeds into the core of the system: a long-term, evolving model of the conversation and its participants. This is where deep context is stored and interconnected.</p>
+                             <ul class="mt-4 space-y-2 list-disc list-inside text-gray-600">
+                                <li><strong>Evolving Context:</strong> Continuously updates its understanding with each new message or interaction.</li>
+                                <li><strong>Vector Database:</strong> Stores text and media embeddings for fast, semantic searching of conversational memory.</li>
+                            </ul>
+                        </div>
+                        <div id="stepper-content-4" class="stepper-content hidden">
+                            <h4 class="text-2xl font-semibold mb-4 text-gray-900">Stage 4: Context Filtering</h4>
+                            <p class="text-gray-700">Not all conversation is equally important. This stage intelligently separates relevant, goal-oriented discussions from unrelated small talk or off-topic threads, ensuring the AI's suggestions are focused and pertinent.</p>
+                            <ul class="mt-4 space-y-2 list-disc list-inside text-gray-600">
+                                <li><strong>Thread Clustering:</strong> Groups messages into distinct topics or threads.</li>
+                                <li><strong>Relevance Scoring:</strong> Prioritizes active, important threads and applies a decay function to older, less relevant context.</li>
+                            </ul>
+                        </div>
+                        <div id="stepper-content-5" class="stepper-content hidden">
+                            <h4 class="text-2xl font-semibold mb-4 text-gray-900">Stage 5: AI Engine</h4>
+                            <p class="text-gray-700">The filtered, relevant context is passed to the AI engine, which generates real-time assistance. This is the "brains" of the operation, where intelligent insights and suggestions are formulated.</p>
+                            <ul class="mt-4 space-y-2 list-disc list-inside text-gray-600">
+                                <li><strong>Steerability & Alerts:</strong> Generates suggestions to guide the conversation and flags potential issues.</li>
+                                <li><strong>Style Adaptation:</strong> Adapts its suggestions to match the user's natural communication style.</li>
+                                <li><strong>Persona Integration:</strong> Incorporates knowledge of the user's and others' personalities for tailored advice.</li>
+                            </ul>
+                        </div>
+                        <div id="stepper-content-6" class="stepper-content hidden">
+                             <h4 class="text-2xl font-semibold mb-4 text-gray-900">Stage 6: Output</h4>
+                            <p class="text-gray-700">The final stage delivers the AI's assistance to the user through a clean, intuitive interface. The goal is to provide helpful guidance without being intrusive.</p>
+                            <ul class="mt-4 space-y-2 list-disc list-inside text-gray-600">
+                                <li><strong>Suggestions & Rephrasing:</strong> Offers alternative ways to phrase messages to achieve a specific tone or outcome.</li>
+                                <li><strong>Reminders:</strong> Brings up unresolved points or past commitments from the conversation history.</li>
+                                <li><strong>Proactive Nudges:</strong> Suggests conversation starters or follow-ups based on temporal context.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="mental-model" class="py-20">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                 <div class="text-center">
+                    <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">The Core: Central Mental Model Formation</h2>
+                    <p class="mt-4 max-w-3xl mx-auto text-lg text-gray-600">At the heart of the assistant is the 'Mental Model,' an evolving, long-term understanding of the conversation's context, participants, and history. It's built from multiple layers of data to provide highly personalized and contextually aware suggestions.</p>
+                </div>
+                <div class="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                    <div>
+                         <h3 class="text-2xl font-semibold text-gray-800 mb-4">Building Blocks of Understanding</h3>
+                         <div class="space-y-4">
+                            <div class="bg-white p-4 rounded-lg shadow"><strong>Historical Conversations:</strong> Learns from past interactions across all connected platforms.</div>
+                            <div class="bg-white p-4 rounded-lg shadow"><strong>Inferred Personality Traits:</strong> Analyzes talking style, tone, and preferences to model participants.</div>
+                            <div class="bg-white p-4 rounded-lg shadow"><strong>Temporal Awareness:</strong> Tracks time gaps and the evolving nature of relationships over months or years.</div>
+                            <div class="bg-white p-4 rounded-lg shadow"><strong>External References:</strong> Notes mentions of third parties (friends, colleagues) to build a richer social context.</div>
+                            <div class="bg-white p-4 rounded-lg shadow"><strong>Media Enrichment:</strong> Integrates context from images, voice notes, and documents, including their metadata.</div>
+                         </div>
+                    </div>
+                    <div class="bg-blue-50 p-8 rounded-lg">
+                        <h3 class="text-2xl font-semibold text-gray-800 mb-4">Practical Application</h3>
+                        <p class="text-gray-700 mb-4">This deep model allows for nuanced, intelligent suggestions:</p>
+                        <ul class="space-y-3">
+                            <li class="flex items-start">
+                                <span class="text-blue-500 font-bold text-xl mr-3">→</span>
+                                <p><strong>If you haven't talked in months,</strong> the assistant suggests a warm reintroduction instead of a direct question.</p>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-blue-500 font-bold text-xl mr-3">→</span>
+                                <p><strong>If a random off-topic chat appears,</strong> it is ignored unless explicitly linked back to a relevant, ongoing thread.</p>
+                            </li>
+                             <li class="flex items-start">
+                                <span class="text-blue-500 font-bold text-xl mr-3">→</span>
+                                <p><strong>If a third person is discussed often,</strong> the assistant builds a lightweight model of them for richer future reference.</p>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="feasibility" class="py-20 bg-white">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center">
+                     <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Feasibility & Technology</h2>
+                    <p class="mt-4 max-w-2xl mx-auto text-lg text-gray-600">This section assesses the project's technical viability, outlining solutions to key challenges and the specific technologies required for implementation. Use the tabs below to explore the analysis.</p>
+                </div>
+
+                <div class="mt-12">
+                    <div class="border-b border-gray-200">
+                        <nav class="-mb-px flex justify-center space-x-8" aria-label="Tabs">
+                            <button id="tab-btn-analysis" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-lg border-blue-500 text-blue-600">Analysis & Challenges</button>
+                            <button id="tab-btn-stack" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-lg border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Technologies Used</button>
+                        </nav>
+                    </div>
+
+                    <div id="tab-content-analysis" class="tab-content mt-8">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                            <div class="chart-container">
+                                <canvas id="feasibilityChart"></canvas>
+                            </div>
+                             <div>
+                                <h3 class="text-2xl font-semibold text-gray-800">Handling Key Challenges</h3>
+                                <p class="mt-2 text-gray-600">While ambitious, the project's primary challenges have viable solutions using modern techniques.</p>
+                                <div class="mt-4 space-y-3">
+                                    <div class="bg-gray-50 p-4 rounded-lg">
+                                        <h4 class="font-semibold text-gray-800">Unrelated Chats & Noise</h4>
+                                        <p class="text-gray-600">Use topic modeling and clustering algorithms to isolate and prioritize relevant conversation threads.</p>
+                                    </div>
+                                    <div class="bg-gray-50 p-4 rounded-lg">
+                                        <h4 class="font-semibold text-gray-800">Time Gaps & Stale Context</h4>
+                                        <p class="text-gray-600">Implement decay functions so older context becomes less influential, while key metadata (e.g., last contact date) remains.</p>
+                                    </div>
+                                    <div class="bg-gray-50 p-4 rounded-lg">
+                                        <h4 class="font-semibold text-gray-800">Media & Multimodal Handling</h4>
+                                        <p class="text-gray-600">Transcribe audio and analyze images to extract text and captions, enriching context instead of ignoring media.</p>
+                                    </div>
+                                     <div class="bg-gray-50 p-4 rounded-lg">
+                                        <h4 class="font-semibold text-gray-800">Privacy & Security</h4>
+                                        <p class="text-gray-600">Store conversation embeddings securely and provide users with granular control to pause or reset the mental model.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="tab-content-stack" class="tab-content mt-8 hidden">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                             <div class="bg-gray-50 p-6 rounded-lg col-span-1 md:col-span-2 lg:col-span-3">
+                                <h4 class="font-semibold text-xl text-gray-800">NLP & AI Models</h4>
+                                <p class="mt-2 text-gray-600">LLMs like Nemotron, GPT, or LLaMA for generation and steering. Rasa can be used for more structured intent classification.</p>
+                            </div>
+                             <div class="bg-gray-50 p-6 rounded-lg">
+                                <h4 class="font-semibold text-xl text-gray-800">Vector Databases</h4>
+                                <p class="text-gray-600 mt-2">Pinecone, Weaviate, or FAISS for storing and searching the mental model's embeddings efficiently.</p>
+                            </div>
+                            <div class="bg-gray-50 p-6 rounded-lg">
+                                <h4 class="font-semibold text-xl text-gray-800">Backend & Real-time</h4>
+                                <p class="text-gray-600 mt-2">Node.js with Express for the server, and WebSockets for low-latency, bidirectional communication.</p>
+                            </div>
+                            <div class="bg-gray-50 p-6 rounded-lg">
+                                <h4 class="font-semibold text-xl text-gray-800">APIs & Integration</h4>
+                                <p class="text-gray-600 mt-2">Official WhatsApp Business API and Slack API for reliable data ingestion from chat platforms.</p>
+                            </div>
+                            <div class="bg-gray-50 p-6 rounded-lg col-span-1 md:col-span-3">
+                                <h4 class="font-semibold text-xl text-gray-800">Media Analysis</h4>
+                                <p class="text-gray-600 mt-2">Multimodal models like OpenAI's CLIP (for image understanding) and Whisper (for audio transcription) to process non-text data.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="roadmap" class="py-20">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center">
+                    <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">MVP Development Roadmap</h2>
+                    <p class="mt-4 max-w-2xl mx-auto text-lg text-gray-600">This roadmap outlines a phased approach to building a Minimum Viable Product (MVP), starting with core text-based features and progressively adding more complex capabilities like voice support and advanced alerts. Click each stage to see the key objectives.</p>
+                </div>
+                <div class="mt-16 grid grid-cols-1 lg:grid-cols-3 gap-12">
+                    <div class="lg:col-span-1">
+                        <div class="relative pl-6 border-l-2 border-blue-200">
+                            <div id="timeline-btn-1" class="timeline-item active mb-10 cursor-pointer">
+                                <h4 class="text-xl font-semibold text-blue-800">Phase 1: Text-First Prototype</h4>
+                                <p class="text-sm text-gray-500">Focus on Web Platforms</p>
+                            </div>
+                            <div id="timeline-btn-2" class="timeline-item mb-10 cursor-pointer">
+                                <h4 class="text-xl font-semibold text-gray-700">Phase 2: Add Voice Support</h4>
+                                <p class="text-sm text-gray-500">Introduce Real-time Transcription</p>
+                            </div>
+                            <div id="timeline-btn-3" class="timeline-item mb-10 cursor-pointer">
+                                <h4 class="text-xl font-semibold text-gray-700">Phase 3: Build Alert System</h4>
+                                <p class="text-sm text-gray-500">Enhance Safety & Awareness</p>
+                            </div>
+                            <div id="timeline-btn-4" class="timeline-item cursor-pointer">
+                                <h4 class="text-xl font-semibold text-gray-700">Phase 4: General-Purpose Expansion</h4>
+                                <p class="text-sm text-gray-500">Scale and Customize</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-2 bg-white p-8 rounded-xl shadow-lg">
+                        <div id="timeline-content-1" class="timeline-content">
+                            <h3 class="text-2xl font-bold mb-4 text-gray-900">Phase 1: Text-First Prototype</h3>
+                            <p class="text-gray-700">The initial focus is on creating a browser extension for Chrome/Edge that works with popular web-based chat platforms. This allows for rapid development and testing of the core AI features without the complexity of real-time voice processing.</p>
+                            <ul class="mt-4 space-y-2 list-disc list-inside text-gray-600">
+                                <li><strong>Target Platform:</strong> WhatsApp Web.</li>
+                                <li><strong>Core Functionality:</strong> Read the conversation, summarize the other person's intent, and suggest 1-2 relevant reply options.</li>
+                                <li><strong>Initial Alert:</strong> Simple alert if the tone of the conversation shifts significantly toward negative sentiment.</li>
+                            </ul>
+                        </div>
+                        <div id="timeline-content-2" class="timeline-content hidden">
+                            <h3 class="text-2xl font-bold mb-4 text-gray-900">Phase 2: Add Voice Support</h3>
+                            <p class="text-gray-700">This phase tackles the challenge of latency by integrating a real-time speech-to-text engine. The initial targets are platforms with more accessible APIs for audio streaming, like video conferencing tools.</p>
+                            <ul class="mt-4 space-y-2 list-disc list-inside text-gray-600">
+                                <li><strong>Target Platforms:</strong> Zoom and Google Meet.</li>
+                                <li><strong>Core Functionality:</strong> Use Whisper to transcribe live calls and display real-time steering suggestions and insights in a side panel.</li>
+                                <li><strong>User Interface:</strong> A non-intrusive overlay that doesn't obstruct the main video call window.</li>
+                            </ul>
+                        </div>
+                        <div id="timeline-content-3" class="timeline-content hidden">
+                            <h3 class="text-2xl font-bold mb-4 text-gray-900">Phase 3: Build Alert System</h3>
+                            <p class="text-gray-700">With the core text and voice features in place, this phase focuses on developing the sophisticated alert engine to provide proactive warnings about conversational risks.</p>
+                             <ul class="mt-4 space-y-2 list-disc list-inside text-gray-600">
+                                <li><strong>Detection Capabilities:</strong> Identify emotional shifts (e.g., from neutral to defensive), contradictions in statements, and potentially manipulative patterns.</li>
+                                <li><strong>Alert Delivery:</strong> Lightweight, subtle popups with clear and concise warnings (e.g., "Caution: Tone has shifted to defensive").</li>
+                            </ul>
+                        </div>
+                        <div id="timeline-content-4" class="timeline-content hidden">
+                            <h3 class="text-2xl font-bold mb-4 text-gray-900">Phase 4: General-Purpose Expansion</h3>
+                            <p class="text-gray-700">The final phase of the MVP roadmap is about expanding the tool's reach and adding user customization features, transforming it from a prototype into a versatile, general-purpose assistant.</p>
+                            <ul class="mt-4 space-y-2 list-disc list-inside text-gray-600">
+                                <li><strong>Platform Expansion:</strong> Create plugins for Slack, Gmail, and LinkedIn messages.</li>
+                                <li><strong>Custom Goals:</strong> Allow users to define specific objectives for a conversation, such as "steer toward closing the deal" or "keep the conversation casual and friendly."</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="vision" class="py-20 bg-white">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Long-Term Potential & Future Vision</h2>
+                <p class="mt-4 max-w-3xl mx-auto text-lg text-gray-600">Beyond the initial product, this project has the potential to evolve into a universal "social intelligence copilot," deeply integrated into our daily digital and physical interactions. This final section explores the ambitious future possibilities for the technology.</p>
+                <div class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="font-semibold text-xl">Wearable Integration</h3>
+                        <p class="mt-2 text-gray-600">Integrate with AR glasses or smart earbuds to whisper suggestions and provide insights during in-person, real-life conversations.</p>
+                    </div>
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="font-semibold text-xl">Relationship Management</h3>
+                        <p class="mt-2 text-gray-600">Pair with calendars and CRM systems to automatically track conversation history and relationship health with contacts.</p>
+                    </div>
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="font-semibold text-xl">Monetization Model</h3>
+                        <p class="mt-2 text-gray-600">Offer a SaaS subscription for professionals and power users, with a freemium model providing core features for casual users.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <section id="references" class="py-20">
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center">
+                     <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Academic & Industry References</h2>
+                    <p class="mt-4 max-w-2xl mx-auto text-lg text-gray-600">This project builds upon a foundation of cutting-edge research in conversational AI, dialogue management, and machine learning.</p>
+                </div>
+                <div class="mt-12 bg-white p-8 rounded-lg shadow-md">
+                    <ol class="list-decimal list-inside space-y-3 text-gray-700">
+                        <li><strong>Moshi by OpenAI (2025)</strong> – Real-time speech-to-speech conversion.</li>
+                        <li><strong>Dialogue Action Tokens (DAT)</strong> – Research on conversational steering.</li>
+                        <li><strong>TopDial</strong> – Framework for target-oriented, multi-session dialogues.</li>
+                        <li><strong>Rasa Framework</strong> – Open-source tools for context-aware conversational agents.</li>
+                        <li><strong>ADVISER by C.-Y. Li et al.</strong> – Toolkit for adaptive dialogue management.</li>
+                        <li><strong>Backchannel Prediction in Dialogue</strong> – Models for realistic, human-like responses.</li>
+                        <li><strong>Vector-based Personalization for LLMs</strong> – Techniques for personalizing model outputs.</li>
+                        <li><strong>Multimodal Embedding Models (CLIP, Whisper)</strong> – Foundational models for image and audio understanding.</li>
+                        <li><strong>Long-term Conversational Memory in AI</strong> – Research on maintaining context over extended periods.</li>
+                        <li><strong>Privacy and Security in Conversational AI Systems</strong> – Best practices for securing sensitive user data.</li>
+                    </ol>
+                </div>
+            </div>
+        </section>
+
+    </main>
+    
+    <footer class="bg-gray-800">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center">
+            <p class="text-gray-400 text-sm">Project Concept Report - Generated September 2025</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            
+            // Navigation scroll highlighting
+            const sections = document.querySelectorAll('section');
+            const navLinks = document.querySelectorAll('.nav-link');
+
+            window.addEventListener('scroll', () => {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    if (pageYOffset >= sectionTop - 80) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').includes(current)) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+
+            // Architecture Stepper Interaction
+            const stepperBtns = document.querySelectorAll('.stepper-item');
+            const stepperContents = document.querySelectorAll('.stepper-content');
+            
+            stepperBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const targetId = btn.id.replace('btn', 'content');
+                    
+                    stepperBtns.forEach(b => {
+                        b.classList.remove('active');
+                        b.classList.add('bg-gray-100', 'text-gray-800', 'border-gray-300');
+                    });
+                    btn.classList.add('active');
+                    btn.classList.remove('bg-gray-100', 'text-gray-800', 'border-gray-300');
+
+                    stepperContents.forEach(content => {
+                        if (content.id === targetId) {
+                            content.classList.remove('hidden');
+                        } else {
+                            content.classList.add('hidden');
+                        }
+                    });
+                });
+            });
+
+
+            // Feasibility Tabs Interaction
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const targetId = btn.id.replace('btn', 'content');
+
+                    tabBtns.forEach(b => {
+                        b.classList.remove('border-blue-500', 'text-blue-600');
+                        b.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                    });
+                    btn.classList.add('border-blue-500', 'text-blue-600');
+                    btn.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+
+                    tabContents.forEach(content => {
+                        if (content.id === targetId) {
+                            content.classList.remove('hidden');
+                        } else {
+                            content.classList.add('hidden');
+                        }
+                    });
+                });
+            });
+
+            // Roadmap Timeline Interaction
+            const timelineBtns = document.querySelectorAll('.timeline-item');
+            const timelineContents = document.querySelectorAll('.timeline-content');
+            
+            timelineBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const phase = btn.id.split('-')[2];
+                    const targetId = `timeline-content-${phase}`;
+
+                    timelineBtns.forEach(b => {
+                        b.classList.remove('active');
+                        b.querySelector('h4').classList.remove('text-blue-800');
+                        b.querySelector('h4').classList.add('text-gray-700');
+                    });
+                    btn.classList.add('active');
+                    btn.querySelector('h4').classList.add('text-blue-800');
+                    btn.querySelector('h4').classList.remove('text-gray-700');
+
+                    timelineContents.forEach(content => {
+                        if (content.id === targetId) {
+                            content.classList.remove('hidden');
+                        } else {
+                            content.classList.add('hidden');
+                        }
+                    });
+                });
+            });
+
+
+            // Feasibility Chart
+            const ctx = document.getElementById('feasibilityChart');
+            if (ctx) {
+                const feasibilityData = {
+                    labels: [
+                        'Media & Speech Analysis', 
+                        'Context Filtering', 
+                        'Personalization (Mental Model)', 
+                        'Low-Latency Steering', 
+                        'API Integration', 
+                        'Privacy & Security'
+                    ],
+                    datasets: [{
+                        label: 'Feasibility with Today\'s Tech',
+                        data: [90, 75, 70, 60, 80, 85],
+                        fill: true,
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        borderColor: 'rgb(59, 130, 246)',
+                        pointBackgroundColor: 'rgb(59, 130, 246)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgb(59, 130, 246)'
+                    }]
+                };
+
+                new Chart(ctx, {
+                    type: 'radar',
+                    data: feasibilityData,
+                    options: {
+                        maintainAspectRatio: false,
+                        elements: {
+                            line: {
+                                borderWidth: 3
+                            }
+                        },
+                        scales: {
+                            r: {
+                                angleLines: {
+                                    display: false
+                                },
+                                suggestedMin: 0,
+                                suggestedMax: 100,
+                                pointLabels: {
+                                    font: {
+                                        size: 13
+                                    }
+                                },
+                                ticks: {
+                                    backdropColor: 'transparent',
+                                    stepSize: 20
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        label += context.formattedValue + '% Feasible';
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    },
+                });
+            }
+        });
+    </script>
+</body>
+</html>
+
